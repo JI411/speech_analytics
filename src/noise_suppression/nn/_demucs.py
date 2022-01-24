@@ -165,13 +165,13 @@ class Demucs(nn.Module):
         will have exactly the same length.
         """
         length = math.ceil(length * self.resample)
-        for idx in range(self.depth):
+        for _ in range(self.depth):
             length = (
                 math.ceil((length - self.kernel_size) / self.stride)
                 + 1
             )
             length = max(length, 1)
-        for idx in range(self.depth):
+        for _ in range(self.depth):
             length = (length - 1) * self.stride + self.kernel_size
         length = int(math.ceil(length / self.resample))
         return int(length)
@@ -399,10 +399,7 @@ class DemucsStreamer:
             self.pending = self.pending[:, stride:]
 
         self.total_time += time.time() - begin
-        if outs:
-            out = th.cat(outs, 1)
-        else:
-            out = th.zeros(chin, 0, device=wav.device)
+        out = th.cat(outs, 1) if outs else th.zeros(chin, 0, device=wav.device)
         return out
 
     def _separate_frame(self, frame):

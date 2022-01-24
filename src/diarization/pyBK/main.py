@@ -41,7 +41,7 @@ def runDiarization(showName, y, sr, config):
                     config['PATH']['SAD'] + showName + '.lab'))
     maskSAD = getSADfile(y, sr, config, showName, nFeatures)
     mask = np.logical_and(maskUEM, maskSAD)
-    mask = mask[0][0:nFeatures]
+    mask = mask[0][:nFeatures]
     nSpeechFeatures = np.sum(mask)
     speechMapping = np.zeros(nFeatures)
     # you need to start the mapping from 1 and end it in the actual number of features independently of the indexing style
@@ -148,10 +148,7 @@ def runDiarization(showName, y, sr, config):
 if __name__ == "__main__":
     # If a config file in INI format is passed by argument line then it's used. 
     # For INI config formatting please refer to https://docs.python.org/3/library/configparser.html
-    if len(sys.argv) >= 2:
-        configFile = sys.argv[1]
-    else:
-        configFile = 'config.ini'
+    configFile = sys.argv[1] if len(sys.argv) >= 2 else 'config.ini'
     config = configparser.ConfigParser()
     config.read(configFile)
 
