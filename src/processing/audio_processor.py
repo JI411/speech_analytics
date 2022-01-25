@@ -84,11 +84,7 @@ class AudioProcessor:
             count_list = self.__white_checker.count_white_phrases(op_text)
 
             for i in range(len(white_weights)):
-                if count_list[i] >= 1:
-                    estimate = 0
-                else:
-                    estimate = white_weights[i][1]
-
+                estimate = 0 if count_list[i] >= 1 else white_weights[i][1]
                 output[white_weights[i][0]] = {
                     'description': white_weights[i][0],
                     'weight': white_weights[i][1],
@@ -119,10 +115,7 @@ class AudioProcessor:
             'estimate': num_interruption
         }
 
-        glob_estimate = 0
-
-        for key in output.keys():
-            glob_estimate += output[key]['estimate']
+        glob_estimate = sum(value_['estimate'] for value_ in output.values())
 
         res = '\n'.join([f'{k}:   {output[k]["count"]}' for k in output])
 

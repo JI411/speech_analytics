@@ -66,11 +66,10 @@ def yandex_speech(input_link: str, bucket: str, aws_secret_access_key: str,
     # Текст результатов распознавания.
     output_text = ''
 
-    if req['done']:
-        for chunk in req['response']['chunks']:
-            c = chunk['alternatives'][0]['text']
-            output_text += ' ' + c
-    else:
+    if not req['done']:
         raise TimeoutError('no response from YSK')
 
+    for chunk in req['response']['chunks']:
+        c = chunk['alternatives'][0]['text']
+        output_text += ' ' + c
     return output_text

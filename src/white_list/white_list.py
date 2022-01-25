@@ -58,8 +58,4 @@ class WhiteCheck:
             json.dump(self.list, file, ensure_ascii=False)
 
     def count_white_phrases(self, input_text: str) -> list:
-        out_list = []
-        for arr in self.list:
-            out_list.append(int(self.search_one_syn_phrase(input_text, arr)))
-
-        return out_list
+        return [int(self.search_one_syn_phrase(input_text, arr)) for arr in self.list]

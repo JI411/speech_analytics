@@ -28,8 +28,7 @@ def kernel_upsample2(zeros=56):
     winodd = win[1::2]
     t = th.linspace(-zeros + 0.5, zeros - 0.5, 2 * zeros)
     t *= math.pi
-    kernel = (sinc(t) * winodd).view(1, 1, -1)
-    return kernel
+    return (sinc(t) * winodd).view(1, 1, -1)
 
 
 def upsample2(x, zeros=56):
@@ -54,8 +53,7 @@ def kernel_downsample2(zeros=56):
     winodd = win[1::2]
     t = th.linspace(-zeros + 0.5, zeros - 0.5, 2 * zeros)
     t.mul_(math.pi)
-    kernel = (sinc(t) * winodd).view(1, 1, -1)
-    return kernel
+    return (sinc(t) * winodd).view(1, 1, -1)
 
 
 def downsample2(x, zeros=56):

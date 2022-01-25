@@ -14,89 +14,98 @@ def extractFeatures(y,sr,framelength,frameshift,nfilters,ncoeff):
     frame_length_inSample=framelength*sr
     hop = int(frameshift*sr)
     NFFT=int(2**np.ceil(np.log2(frame_length_inSample)))
-    if sr>=16000:
-        features=librosa.feature.mfcc(y=y, sr=sr,dct_type=2,n_mfcc=ncoeff,n_mels=nfilters,n_fft=NFFT,hop_length=hop,fmin=20,fmax=7600).T
-    else:
-        features=librosa.feature.mfcc(y=y, sr=sr,dct_type=2,n_mfcc=ncoeff,n_mels=nfilters,n_fft=NFFT,hop_length=hop).T
-    return features
+    return (
+        librosa.feature.mfcc(
+            y=y,
+            sr=sr,
+            dct_type=2,
+            n_mfcc=ncoeff,
+            n_mels=nfilters,
+            n_fft=NFFT,
+            hop_length=hop,
+            fmin=20,
+            fmax=7600,
+        ).T
+        if sr >= 16000
+        else librosa.feature.mfcc(
+            y=y,
+            sr=sr,
+            dct_type=2,
+            n_mfcc=ncoeff,
+            n_mels=nfilters,
+            n_fft=NFFT,
+            hop_length=hop,
+        ).T
+    )
 
 def getFeatures(featureFile):
     features = HTKFile()
     features.load(featureFile)
-    allData = np.asarray(features.data)
-    return allData
+    return np.asarray(features.data)
 
 def readUEMfile(path,filename,ext,nFeatures,frameshift):    
     uemFile = path + filename + ext
-    notEvaluatedFramesMask=np.zeros([1, nFeatures])    
-    f=open(uemFile,'r')
-    C=f.read().splitlines()
-    f.close()    
+    notEvaluatedFramesMask=np.zeros([1, nFeatures])
+    with open(uemFile,'r') as f:
+        C=f.read().splitlines()
     initTime = []
     endTime = []
     if C:
         if len(C[0])>1:
-            for idx,x in enumerate(C):        
+            for x in C:
                 initTime=np.append(initTime,float(x.strip().split(' ')[2]))
                 endTime=np.append(endTime,float(x.strip().split(' ')[3]))
     else:
         print('UEM annotations file was empty. The complete file is considered evaluable.')
-        
+
     if type(initTime) is list:
         notEvaluatedFramesMask = np.ones([1,nFeatures])
     else:
-        initTime = np.floor(initTime/frameshift)        
-        endTime = np.floor(endTime/frameshift)        
+        initTime = np.floor(initTime/frameshift)
+        endTime = np.floor(endTime/frameshift)
         for idxT,x in np.ndenumerate(initTime):
-            it=initTime[idxT]        
-            if endTime[idxT]>nFeatures:
-                et = nFeatures
-            else:
-                et = endTime[idxT]        
+            it=initTime[idxT]
+            et = nFeatures if endTime[idxT]>nFeatures else endTime[idxT]
             notEvaluatedFramesMask[0,int(it):int(et)]=1
     return notEvaluatedFramesMask
   
 def readSADfile(path,filename,ext,nFeatures,frameshift, format):   
     sadFile = path + filename + ext
-    notEvaluatedFramesMask=np.zeros([1, nFeatures])    
-    f=open(sadFile,'r')
-    C=f.read().splitlines()
-    f.close()    
+    notEvaluatedFramesMask=np.zeros([1, nFeatures])
+    with open(sadFile,'r') as f:
+        C=f.read().splitlines()
     initTime = []
     endTime = []
     if C:
         if len(C[0])>1:
             if format=='LBL':
-                for idx,x in enumerate(C):        
+                for x in C:
                     initTime=np.append(initTime,float(x.strip().split(' ')[0]))
                     endTime=np.append(endTime,float(x.strip().split(' ')[1]))
             elif format=='RTTM':
-                for idx,x in enumerate(C):        
+                for x in C:
                     initTime=np.append(initTime,float(x.strip().split(' ')[3]))
-                    endTime=np.append(endTime,float(x.strip().split(' ')[3])+float(x.strip().split(' ')[4]))         
+                    endTime=np.append(endTime,float(x.strip().split(' ')[3])+float(x.strip().split(' ')[4]))
             elif format=='MDTM':
-                for idx,x in enumerate(C):        
+                for x in C:
                     initTime=np.append(initTime,float(x.strip().split(' ')[2]))
                     endTime=np.append(endTime,float(x.strip().split(' ')[2])+float(x.strip().split(' ')[3]))
     else:
         print('SAD annotations file was empty. The complete file is considered speech.')
-    
+
     if type(initTime) is list:
-        notEvaluatedFramesMask = np.ones([1,nFeatures])        
-    else:        
-        initTime = np.round(initTime/frameshift)        
-        endTime = np.round(endTime/frameshift)        
+        notEvaluatedFramesMask = np.ones([1,nFeatures])
+    else:    
+        initTime = np.round(initTime/frameshift)
+        endTime = np.round(endTime/frameshift)
         for idxT,x in np.ndenumerate(initTime):
-            it=initTime[idxT]        
-            if endTime[idxT]>nFeatures:
-                et = nFeatures
-            else:
-                et = endTime[idxT]        
+            it=initTime[idxT]
+            et = nFeatures if endTime[idxT]>nFeatures else endTime[idxT]
             notEvaluatedFramesMask[0,int(it):int(et)]=1
     return notEvaluatedFramesMask
 
 def getSADfile(data, sr, config,filename,nFeatures):
-    
+
     """ The following VAD applying procedure is adapted from the repository
     provided as part of the DIHARD II challenge speech enhancement system:    
     https://github.com/staplesinLA/denoising_DIHARD18/blob/master/main_get_vad.py"""
@@ -107,17 +116,22 @@ def getSADfile(data, sr, config,filename,nFeatures):
     va_framed = py_webrtcvad(data, fs=sr, fs_vad=sr, hoplength=30, vad_mode=0)
     segments = get_py_webrtcvad_segments(va_framed,sr)
     if not os.path.isdir(config['PATH']['SAD']):
-        os.mkdir(config['PATH']['SAD'])     
+        os.mkdir(config['PATH']['SAD'])
     if os.path.isfile(config['PATH']['SAD']+filename+'.lab'):
-        os.remove(config['PATH']['SAD']+filename+'.lab')    
-    output_file = open(config['PATH']['SAD']+filename+'.lab','w')
-    for i in range(segments.shape[0]):
-        start_time = segments[i][0]
-        end_time =  segments[i][1]
-        output_file.write("%.3f %.3f speech\n" % (start_time, end_time))
-    output_file.close()
-    maskSAD = readSADfile(config['PATH']['SAD'],filename,'.lab',nFeatures,config.getfloat('FEATURES','frameshift'),'LBL')   
-    return maskSAD
+        os.remove(config['PATH']['SAD']+filename+'.lab')
+    with open(config['PATH']['SAD']+filename+'.lab','w') as output_file:
+        for i in range(segments.shape[0]):
+            start_time = segments[i][0]
+            end_time =  segments[i][1]
+            output_file.write("%.3f %.3f speech\n" % (start_time, end_time))
+    return readSADfile(
+        config['PATH']['SAD'],
+        filename,
+        '.lab',
+        nFeatures,
+        config.getfloat('FEATURES', 'frameshift'),
+        'LBL',
+    )
 
 def py_webrtcvad(data, fs, fs_vad, hoplength=30, vad_mode=0):    
     import webrtcvad
@@ -181,15 +195,11 @@ def py_webrtcvad(data, fs, fs_vad, hoplength=30, vad_mode=0):
         raise ValueError('data dtype must be int or float.')
 
     data = data.squeeze()
-    if not data.ndim == 1:
+    if data.ndim != 1:
         raise ValueError('data must be mono (1 ch).')
 
     # resampling
-    if fs != fs_vad:
-        resampled = resample(data, fs, fs_vad)
-    else:
-        resampled = data
-
+    resampled = resample(data, fs, fs_vad) if fs != fs_vad else data
     resampled = resampled.astype('int16')
 
     hop = fs_vad * hoplength // 1000
@@ -197,7 +207,7 @@ def py_webrtcvad(data, fs, fs_vad, hoplength=30, vad_mode=0):
     padlen = framelen * hop - resampled.size
     paded = np.lib.pad(resampled, (0, padlen), 'constant', constant_values=0)
     framed = frame(paded, frame_length=hop, hop_length=hop).T    
-    
+
     vad = webrtcvad.Vad()
     vad.set_mode(vad_mode)
     valist = [vad.is_speech(tmp.tobytes(), fs_vad) for tmp in framed]
@@ -347,7 +357,7 @@ def getSegmentBKs(segmentTable, kbmSize, Vg, bitsPerSegmentFactor, speechMapping
 def binarizeFeatures(binaryKeySize, topComponentIndicesMatrix, bitsPerSegmentFactor):
     # BINARIZEMATRIX Extracts a binary key and a cumulative vector from the the
     # rows of VG specified by vector A
-    
+
     # Inputs:
     #   BINARYKEYSIZE = binary key size
     #   TOPCOMPONENTINDICESMATRIX = matrix of top Gaussians per frame
@@ -355,33 +365,28 @@ def binarizeFeatures(binaryKeySize, topComponentIndicesMatrix, bitsPerSegmentFac
     # Output:
     #   BINARYKEY = 1xBINARYKEYSIZE binary key
     #   V_F = 1xBINARYKEYSIZE cumulative vector
-    numberOfElementsBinaryKey = np.floor(binaryKeySize * bitsPerSegmentFactor)    
+    numberOfElementsBinaryKey = np.floor(binaryKeySize * bitsPerSegmentFactor)
     # Declare binaryKey
     binaryKey = np.zeros([1, binaryKeySize])
     # Declare cumulative vector v_f
-    v_f = np.zeros([1, binaryKeySize])    
-    unique, counts = np.unique(topComponentIndicesMatrix, return_counts=True)    
+    v_f = np.zeros([1, binaryKeySize])
+    unique, counts = np.unique(topComponentIndicesMatrix, return_counts=True)
     # Fill CV
-    v_f[:,unique]=counts    
+    v_f[:,unique]=counts
     # Fill BK
-    binaryKey[0,np.argsort(-v_f)[0][0:int(numberOfElementsBinaryKey)]]=1    
+    binaryKey[0, np.argsort(-v_f)[0][:int(numberOfElementsBinaryKey)]] = 1
     # CV normalization
-    v_f = v_f/np.sum(v_f)    
+    v_f = v_f/np.sum(v_f)
     return binaryKey, v_f
 
 def performClusteringLinkage(segmentBKTable, segmentCVTable, N_init, linkageCriterion,linkageMetric ):
     from scipy.cluster.hierarchy import linkage
     from scipy import cluster
-    if linkageMetric == 'jaccard':
-      observations = segmentBKTable
-    elif linkageMetric == 'cosine':
-      observations = segmentCVTable
-    else:
-      observations = segmentCVTable      
-    clusteringTable = np.zeros([np.size(segmentCVTable,0),N_init]) 
+    observations = segmentBKTable if linkageMetric == 'jaccard' else segmentCVTable
+    clusteringTable = np.zeros([np.size(segmentCVTable,0),N_init])
     Z = linkage(observations,method=linkageCriterion,metric=linkageMetric)
     for i in np.arange(N_init):
-      clusteringTable[:,i] = cluster.hierarchy.cut_tree(Z,N_init-i).T+1  
+      clusteringTable[:,i] = cluster.hierarchy.cut_tree(Z,N_init-i).T+1
     k=N_init
     print('done')
     return clusteringTable, k
@@ -521,15 +526,15 @@ def getBestClustering(bestClusteringMetric, bkT, cvT, clusteringTable, n, maxNrS
 def getSpectralClustering(bestClusteringMetric,clusteringTable,N_init, bkT, cvT, n, sigma, percentile,maxNrSpeakers):
     from scipy.ndimage.filters import gaussian_filter
     simMatrix = binaryKeySimilarity_cdist(bestClusteringMetric,bkT,cvT,bkT,cvT)
-    np.fill_diagonal(simMatrix,np.nan)       
-    np.fill_diagonal(simMatrix,np.nanmax(simMatrix,1))    
+    np.fill_diagonal(simMatrix,np.nan)
+    np.fill_diagonal(simMatrix,np.nanmax(simMatrix,1))
     # Similarity matrix smoothed through Gaussian filter
     simMatrix_1 = gaussian_filter(simMatrix,sigma)
     # Similarity matrix thresholded to the percentile-th components leaving a small amount instead of 0 following Google's implementation
     thresholds = np.tile(percentile*np.nanmax(simMatrix,1)/100,(np.size(bkT,0),1)).T
     simMatrix_2 = np.copy(simMatrix_1)
     mask = simMatrix_2<thresholds
-    simMatrix_2[np.where(mask==True)] = simMatrix_2[np.where(mask==True)]*0.01
+    simMatrix_2[np.where(mask)] = simMatrix_2[np.where(mask)] * 0.01
     # Similarity matrix made symmetric
     simMatrix_3 = np.copy(simMatrix_2)
     for k in np.arange(np.size(simMatrix_3,0)):
@@ -537,31 +542,29 @@ def getSpectralClustering(bestClusteringMetric,clusteringTable,N_init, bkT, cvT,
         maximum = np.maximum(simMatrix_3[:,k],simMatrix_3[k,:])
         simMatrix_3[:,k] = simMatrix_3[k,:] = maximum
     # Similarity matrix diffussion
-    simMatrix_4 = np.dot(simMatrix_3,simMatrix_3)   
+    simMatrix_4 = np.dot(simMatrix_3,simMatrix_3)
     # Row-wise max normalization
     simMatrix_5 = simMatrix_4 / np.tile(simMatrix_4.max(axis=0),(np.size(simMatrix_4,0),1)).T
     # Decomposition in eigenvalues, we don't use eigenvectors for the moment
     eigenvalues,eigenvectors = np.linalg.eigh(simMatrix_5)
     new_N_init = np.minimum(maxNrSpeakers,N_init)
-    eigenvalues = np.flip(np.sort(eigenvalues),axis=0)[0:new_N_init]
+    eigenvalues = np.flip(np.sort(eigenvalues),axis=0)[:new_N_init]
     if new_N_init > 1:
-        eigengaps = eigenvalues[0:new_N_init-1]/eigenvalues[1:new_N_init]
-        eigengapssubstract = eigenvalues[0:new_N_init-1] - eigenvalues[1:new_N_init] 
+        eigengaps = eigenvalues[:new_N_init-1] / eigenvalues[1:new_N_init]
+        eigengapssubstract = eigenvalues[:new_N_init-1] - eigenvalues[1:new_N_init]
     else:
-        eigengaps = eigengapssubstract = eigenvalues       
+        eigengaps = eigengapssubstract = eigenvalues
     if eigengapssubstract[0] > 340:
         kclusters = 1
     else:
         eigengaps[0]=0  
         kclusters = np.flip(np.argsort(eigengaps),axis=0)[0]+1  
-    
+
     nrElements = np.zeros([N_init,1])
     for k in np.arange(N_init):
         nrElements[k]=np.size(np.unique(clusteringTable[:,k]),0)
-    distances = np.abs(nrElements-kclusters)    
-    minidx = np.argmin(distances)
-    bestClusteringID = minidx  
-    return bestClusteringID
+    distances = np.abs(nrElements-kclusters)
+    return np.argmin(distances)
 
 def smooth(a,WSZ):
     # a: NumPy 1-D array containing the data to be smoothed
